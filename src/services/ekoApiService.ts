@@ -25,6 +25,8 @@ export class EkoApiService {
         error: 'Insufficient credits in wallet'
       };
     }
+      console.log('[makeRequest] Entered function for endpoint:', endpoint);
+
 
     try {
       console.log('Making API request to:', `${EKO_BASE_URL}${endpoint}`);
@@ -34,9 +36,12 @@ export class EkoApiService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.apiKey}`,
-          'X-API-Key': this.apiKey,
-          'Accept': 'application/json'
+          // 'Authorization': `Bearer ${this.apiKey}`,   // uncomment if you really need it
+          'developer_key': '0edddf5605e083638ee94ff26686e967',
+          'secret-key': 'VBdppVBSfyW23iSCOSncBFC1zV3MD/MnmwngP/yb4Cw=',
+          'secret-key-timestamp': '1750667827291',
+          // 'X-API-Key': this.apiKey,
+          Accept: 'application/json'
         },
         body: JSON.stringify(data)
       });
@@ -85,12 +90,28 @@ export class EkoApiService {
     });
   }
 
-  async verifyPAN(panNumber: string, name: string) {
-    return this.makeRequest('/pan/verify', {
+async verifyPAN(panNumber: string, name: string, dob: string) {
+  console.log('[verifyPAN] Called with:', { panNumber, name });
+  try {
+    const requestData = {
       pan_number: panNumber,
-      name: name
-    });
+      initiator_id: 7417247999,
+      //dob: '2000-08-13',
+      user_code: 32515001,
+      name: name,
+      dob: dob
+    };
+    console.log('[verifyPAN] Sending request data:', requestData);
+
+    const response = await this.makeRequest('/tools/kyc/pan-lite', requestData);
+
+    console.log('[verifyPAN] Received response:', response);
+    return response;
+  } catch (error) {
+    console.error('[verifyPAN] Error occurred:', error);
+    throw error;
   }
+}
 
   async verifyAadhaar(aadhaarNumber: string, name: string) {
     return this.makeRequest('/aadhaar/verify', {

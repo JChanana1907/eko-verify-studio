@@ -108,7 +108,8 @@ const ResultsManager: React.FC<ResultsManagerProps> = ({ results, setResults }) 
     if (value === undefined) return 'undefined';
     if (typeof value === 'object') {
       try {
-        return JSON.stringify(value);
+            // 2-space indentation makes key-value pairs line-by-line
+            return JSON.stringify(value, null, 2);
       } catch {
         return '[Object]';
       }
