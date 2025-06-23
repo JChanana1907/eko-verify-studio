@@ -1,4 +1,4 @@
-const EKO_BASE_URL = 'https://corsproxy.io/?https://api.eko.in:25002/ekoicici/v3';
+const EKO_BASE_URL = 'https://api.eko.in:25002/ekoicici/v3';
 const DEFAULT_API_KEY = '0edddf5605e083638ee94ff26686e967';
 
 interface ApiResponse {
