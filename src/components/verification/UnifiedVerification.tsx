@@ -442,6 +442,7 @@ const UnifiedVerification: React.FC<UnifiedVerificationProps> = ({ apiKey, onRes
 
         if (!apiResult) continue;
 
+        // Use the same response processing logic as EmploymentVerification
         const raw = apiResult.data?.data ?? apiResult.data;
         let displayResponse: { verified?: boolean; details?: any };
 

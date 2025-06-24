@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -62,40 +61,21 @@ const Payment = () => {
     
     try {
       const ekoService = new EkoApiService(apiKey);
+      const transactionId = `TXN_${Date.now()}`;
       
-      // Generate QR code using Eko API
-      const qrData = {
-        merchant_id: 'MERCHANT_ID', // This should be your actual merchant ID
-        amount: parseFloat(amount),
-        transaction_id: `TXN_${Date.now()}`,
-        purpose_code: '00', // Person to Person transfer
-        merchant_name: 'Eko Shield',
-        merchant_upi_id: 'merchant@upi', // Your actual UPI ID
-        expiry_minutes: 30
-      };
+      // Use the actual Eko QR API
+      const response = await ekoService.generateDynamicQR(
+        parseFloat(amount),
+        transactionId,
+        'Eko Shield'
+      );
 
-      // Call the Eko QR generation API
-      const response = await fetch('https://api.eko.in:25002/ekoicici/v3/upi/generate-qr', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'developer_key': apiKey,
-          'secret-key': 'your-secret-key', // This should be your actual secret key
-        },
-        body: JSON.stringify({
-          initiator_id: 7417247999,
-          user_code: 32515001,
-          ...qrData
-        })
-      });
-
-      const result = await response.json();
-      
-      if (result.status === 0 && result.data?.qr_string) {
-        setQrCode(result.data.qr_string);
+      if (response.success && response.data?.data?.qr_string) {
+        setQrCode(response.data.data.qr_string);
         toast.success("QR Code generated successfully!");
       } else {
-        toast.error(result.message || "Failed to generate QR code");
+        console.error('QR API response:', response);
+        toast.error(response.error || "Failed to generate QR code");
       }
     } catch (error) {
       console.error('QR generation error:', error);
