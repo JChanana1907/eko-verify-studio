@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -63,7 +62,7 @@ const UnifiedVerification: React.FC<UnifiedVerificationProps> = ({ apiKey, onRes
       color: 'bg-green-500', 
       category: 'employment', 
       description: 'Verify Aadhaar card details', 
-      fields: ['aadhaar_number', 'initiator_id', 'user_code'] 
+      fields: ['aadhaar_number', 'name', 'initiator_id', 'user_code'] 
     },
     { 
       id: 'bank-account', 
@@ -72,7 +71,7 @@ const UnifiedVerification: React.FC<UnifiedVerificationProps> = ({ apiKey, onRes
       color: 'bg-purple-500', 
       category: 'employment', 
       description: 'Verify bank account details', 
-      fields: ['account_number', 'ifsc_code', 'initiator_id', 'user_code'] 
+      fields: ['account_number', 'ifsc_code', 'name', 'initiator_id', 'user_code'] 
     },
     { 
       id: 'mobile-otp', 
@@ -90,7 +89,7 @@ const UnifiedVerification: React.FC<UnifiedVerificationProps> = ({ apiKey, onRes
       color: 'bg-indigo-500', 
       category: 'employment', 
       description: 'Access Digilocker documents', 
-      fields: ['aadhaar_number', 'mobile_number', 'initiator_id', 'user_code'] 
+      fields: ['digilocker_id', 'initiator_id', 'user_code'] 
     },
     { 
       id: 'voter-id', 
@@ -99,7 +98,7 @@ const UnifiedVerification: React.FC<UnifiedVerificationProps> = ({ apiKey, onRes
       color: 'bg-red-500', 
       category: 'employment', 
       description: 'Verify voter ID details', 
-      fields: ['voter_id', 'name', 'state', 'initiator_id', 'user_code'] 
+      fields: ['voter_id', 'name', 'initiator_id', 'user_code'] 
     },
     { 
       id: 'passport', 
@@ -108,7 +107,7 @@ const UnifiedVerification: React.FC<UnifiedVerificationProps> = ({ apiKey, onRes
       color: 'bg-teal-500', 
       category: 'employment', 
       description: 'Verify passport details', 
-      fields: ['passport_number', 'name', 'dob', 'initiator_id', 'user_code'] 
+      fields: ['passport_number', 'name', 'initiator_id', 'user_code'] 
     },
     { 
       id: 'employee-details', 
@@ -137,7 +136,7 @@ const UnifiedVerification: React.FC<UnifiedVerificationProps> = ({ apiKey, onRes
       color: 'bg-green-600', 
       category: 'gstin', 
       description: 'Verify GSTIN registration', 
-      fields: ['gstin_number', 'initiator_id', 'user_code'] 
+      fields: ['gstin_number', 'business_name', 'initiator_id', 'user_code'] 
     },
     
     // Vehicle Services - Updated with proper API fields
@@ -148,7 +147,7 @@ const UnifiedVerification: React.FC<UnifiedVerificationProps> = ({ apiKey, onRes
       color: 'bg-orange-500', 
       category: 'vehicle', 
       description: 'Verify vehicle registration certificate', 
-      fields: ['registration_number', 'initiator_id', 'user_code'] 
+      fields: ['registration_number', 'owner_name', 'initiator_id', 'user_code'] 
     },
     { 
       id: 'driving-licence', 
@@ -157,7 +156,7 @@ const UnifiedVerification: React.FC<UnifiedVerificationProps> = ({ apiKey, onRes
       color: 'bg-red-500', 
       category: 'vehicle', 
       description: 'Verify driving licence details', 
-      fields: ['licence_number', 'dob', 'initiator_id', 'user_code'] 
+      fields: ['licence_number', 'holder_name', 'date_of_birth', 'initiator_id', 'user_code'] 
     },
     
     // Financial Services - Updated with proper API fields
@@ -333,58 +332,108 @@ const UnifiedVerification: React.FC<UnifiedVerificationProps> = ({ apiKey, onRes
         switch (serviceId) {
           case 'bank-account':
             apiResult = await ekoService.verifyBankAccount(
-              defaultData.account_number, defaultData.ifsc_code, defaultData.initiator_id, defaultData.user_code
+              defaultData.account_number, defaultData.ifsc_code, defaultData.name
             );
             break;
           case 'pan':
             apiResult = await ekoService.verifyPAN(
-              defaultData.pan_number, defaultData.name, defaultData.dob, defaultData.initiator_id, defaultData.user_code
+              defaultData.pan_number, defaultData.name, defaultData.dob
             );
             break;
           case 'aadhaar':
             apiResult = await ekoService.verifyAadhaar(
-              defaultData.aadhaar_number, defaultData.initiator_id, defaultData.user_code
+              defaultData.aadhaar_number, defaultData.name
             );
             break;
           case 'mobile-otp':
-            apiResult = await ekoService.sendMobileOTP(defaultData.mobile_number, defaultData.initiator_id, defaultData.user_code);
+            apiResult = await ekoService.sendMobileOTP(defaultData.mobile_number);
             break;
           case 'digilocker':
-            apiResult = await ekoService.accessDigilocker(defaultData.aadhaar_number, defaultData.mobile_number, defaultData.initiator_id, defaultData.user_code);
+            apiResult = await ekoService.accessDigilocker(defaultData.digilocker_id);
             break;
           case 'voter-id':
             apiResult = await ekoService.verifyVoterID(
-              defaultData.voter_id, defaultData.name, defaultData.state, defaultData.initiator_id, defaultData.user_code
+              defaultData.voter_id, defaultData.name
             );
             break;
           case 'passport':
             apiResult = await ekoService.verifyPassport(
-              defaultData.passport_number, defaultData.name, defaultData.dob, defaultData.initiator_id, defaultData.user_code
+              defaultData.passport_number, defaultData.name
             );
             break;
           case 'employee-details':
             apiResult = await ekoService.verifyEmployeeDetails(
-              defaultData.employee_id, defaultData.company_name, defaultData.initiator_id, defaultData.user_code
+              defaultData.employee_id, defaultData.company_name
             );
             break;
           case 'name-match':
             apiResult = await ekoService.nameMatch(
-              defaultData.name1, defaultData.name2, defaultData.initiator_id, defaultData.user_code
+              defaultData.name1, defaultData.name2
             );
             break;
           case 'gstin':
             apiResult = await ekoService.verifyGSTIN(
-              defaultData.gstin_number, defaultData.initiator_id, defaultData.user_code
+              defaultData.gstin_number, defaultData.business_name
             );
             break;
           case 'vehicle-rc':
             apiResult = await ekoService.verifyVehicleRC(
-              defaultData.registration_number, defaultData.initiator_id, defaultData.user_code
+              defaultData.registration_number, defaultData.owner_name
             );
             break;
           case 'driving-licence':
             apiResult = await ekoService.verifyDrivingLicence(
-              defaultData.licence_number, defaultData.dob, defaultData.initiator_id, defaultData.user_code
+              defaultData.licence_number, defaultData.holder_name, defaultData.date_of_birth
+            );
+            break;
+          case 'credit-score':
+            apiResult = await ekoService.getCreditScore(
+              defaultData.pan_number, defaultData.mobile_number
+            );
+            break;
+          case 'bank-statement':
+            apiResult = await ekoService.analyzeBankStatement(
+              defaultData.account_number, defaultData.bank_name, defaultData.statement_period
+            );
+            break;
+          case 'income-verification':
+            apiResult = await ekoService.verifyIncome(
+              defaultData.pan_number, defaultData.employer_name, defaultData.salary_account
+            );
+            break;
+          case 'loan-eligibility':
+            apiResult = await ekoService.checkLoanEligibility(
+              defaultData.pan_number, defaultData.monthly_income, defaultData.loan_amount
+            );
+            break;
+          case 'medical-license':
+            apiResult = await ekoService.verifyMedicalLicense(
+              defaultData.license_number, defaultData.doctor_name, defaultData.specialization
+            );
+            break;
+          case 'insurance-policy':
+            apiResult = await ekoService.verifyInsurancePolicy(
+              defaultData.policy_number, defaultData.insurer_name, defaultData.policy_holder
+            );
+            break;
+          case 'pharmacy-license':
+            apiResult = await ekoService.verifyPharmacyLicense(
+              defaultData.license_number, defaultData.pharmacy_name, defaultData.permit_type
+            );
+            break;
+          case 'degree-verification':
+            apiResult = await ekoService.verifyDegree(
+              defaultData.degree_number, defaultData.university_name, defaultData.student_name, defaultData.graduation_year
+            );
+            break;
+          case 'professional-certification':
+            apiResult = await ekoService.verifyProfessionalCertification(
+              defaultData.certificate_number, defaultData.certifying_body, defaultData.certificate_holder
+            );
+            break;
+          case 'regulatory-compliance':
+            apiResult = await ekoService.checkRegulatoryCompliance(
+              defaultData.license_number, defaultData.regulatory_body, defaultData.license_holder, defaultData.license_type
             );
             break;
           default:
