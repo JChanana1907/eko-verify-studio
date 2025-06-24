@@ -513,16 +513,14 @@ const UnifiedVerification: React.FC<UnifiedVerificationProps> = ({ apiKey, onRes
     if (isDateField) {
       return (
         <div className="space-y-2">
-          {/* Manual date input */}
           <Input
             type="text"
-            placeholder="YYYY-MM-DD"
+            placeholder="YYYY-MM-DD or use calendar below"
             value={fieldValue}
             onChange={(e) => handleInputChange(serviceId, field, e.target.value)}
             pattern="\d{4}-\d{2}-\d{2}"
             className="w-full"
           />
-          {/* Calendar picker */}
           <Popover>
             <PopoverTrigger asChild>
               <Button
@@ -556,12 +554,12 @@ const UnifiedVerification: React.FC<UnifiedVerificationProps> = ({ apiKey, onRes
         placeholder={`Enter ${field.replace(/_/g, ' ')}`}
         value={fieldValue}
         onChange={(e) => handleInputChange(serviceId, field, e.target.value)}
-        className="mt-1"
+        className="w-full"
       />
     );
   };
 
-  // If "all" category is selected, show all services in a unified view
+  // If "all" category is selected, show all services in a unified view with consistent styling
   if (selectedCategory === "all") {
     return (
       <div className="space-y-6">
@@ -599,11 +597,11 @@ const UnifiedVerification: React.FC<UnifiedVerificationProps> = ({ apiKey, onRes
           </div>
         </Card>
 
-        {/* All Services Grid */}
+        {/* All Services Grid - Consistent with other tabs */}
         <Card className="p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-slate-900">
-              All Available APIs ({filteredServices.length})
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-xl font-semibold text-slate-900">
+              Available Verification Services ({filteredServices.length})
             </h3>
             {selectedServices.length > 0 && (
               <Badge variant="outline" className="text-blue-700 border-blue-200 bg-blue-50">
@@ -616,26 +614,26 @@ const UnifiedVerification: React.FC<UnifiedVerificationProps> = ({ apiKey, onRes
             {filteredServices.map((service) => (
               <Card 
                 key={service.id} 
-                className={`p-4 cursor-pointer transition-all hover:shadow-md border-2 ${
+                className={`p-4 cursor-pointer transition-all hover:shadow-md border ${
                   selectedServices.includes(service.id) 
-                    ? 'border-blue-500 bg-blue-50' 
+                    ? 'border-blue-500 bg-blue-50 shadow-md' 
                     : 'border-slate-200 hover:border-slate-300'
                 }`}
                 onClick={() => handleServiceSelect(service.id)}
               >
-                <div className="flex items-center space-x-3">
-                  <div className={`p-2 rounded-md ${service.color}`}>
-                    <service.icon className="h-4 w-4 text-white" />
+                <div className="flex items-start space-x-3">
+                  <div className={`p-2 rounded-lg ${service.color} flex-shrink-0`}>
+                    <service.icon className="h-5 w-5 text-white" />
                   </div>
-                  <div className="flex-1">
-                    <h4 className="font-medium text-slate-900">{service.name}</h4>
-                    <p className="text-sm text-slate-600">{service.description}</p>
-                    <Badge variant="outline" className="mt-1 text-xs">
+                  <div className="flex-1 min-w-0">
+                    <h4 className="font-semibold text-slate-900 mb-1 text-sm">{service.name}</h4>
+                    <p className="text-xs text-slate-600 mb-2 line-clamp-2">{service.description}</p>
+                    <Badge variant="outline" className="text-xs">
                       {service.category}
                     </Badge>
                   </div>
                   {selectedServices.includes(service.id) && (
-                    <div className="text-blue-600">
+                    <div className="text-blue-600 flex-shrink-0">
                       <Shield className="h-4 w-4" />
                     </div>
                   )}
@@ -645,19 +643,20 @@ const UnifiedVerification: React.FC<UnifiedVerificationProps> = ({ apiKey, onRes
           </div>
 
           {filteredServices.length === 0 && (
-            <div className="text-center py-8 text-slate-500">
-              <Search className="h-12 w-12 mx-auto mb-3 opacity-50" />
-              <p>No services found matching your search.</p>
+            <div className="text-center py-12 text-slate-500">
+              <Search className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p className="text-lg font-medium mb-2">No services found</p>
+              <p className="text-sm">Try adjusting your search criteria</p>
             </div>
           )}
         </Card>
 
-        {/* Configuration panel for selected services */}
+        {/* Configuration panel for selected services - Consistent styling */}
         {selectedServices.length > 0 && (
           <Card className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-slate-900">Configure Selected Services</h3>
-              <Badge variant="secondary">{selectedServices.length} selected</Badge>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-semibold text-slate-900">Configure Selected Services</h3>
+              <Badge variant="secondary" className="text-sm">{selectedServices.length} selected</Badge>
             </div>
 
             <div className="space-y-6">
@@ -667,14 +666,14 @@ const UnifiedVerification: React.FC<UnifiedVerificationProps> = ({ apiKey, onRes
 
                 const Icon = service.icon;
                 return (
-                  <div key={serviceId} className="p-4 border border-slate-200 rounded-lg">
-                    <div className="flex items-center justify-between mb-3">
+                  <Card key={serviceId} className="p-6 border border-slate-200">
+                    <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center space-x-3">
-                        <div className={`p-2 rounded-md ${service.color}`}>
-                          <Icon className="h-4 w-4 text-white" />
+                        <div className={`p-2 rounded-lg ${service.color}`}>
+                          <Icon className="h-5 w-5 text-white" />
                         </div>
                         <div>
-                          <h4 className="font-medium text-slate-900">{service.name}</h4>
+                          <h4 className="font-semibold text-slate-900">{service.name}</h4>
                           <p className="text-sm text-slate-600">{service.description}</p>
                         </div>
                       </div>
@@ -684,27 +683,25 @@ const UnifiedVerification: React.FC<UnifiedVerificationProps> = ({ apiKey, onRes
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {service.fields.map(field => (
-                        <div key={field}>
-                          <Label className="text-sm font-medium capitalize">
+                      {service.fields.filter(field => field !== 'initiator_id' && field !== 'user_code').map(field => (
+                        <div key={field} className="space-y-2">
+                          <Label className="text-sm font-medium text-slate-700 capitalize">
                             {field.replace(/_/g, ' ')}
                           </Label>
                           {renderInputField(serviceId, field)}
                         </div>
                       ))}
                     </div>
-
-                    {idx < selectedServices.length - 1 && <Separator className="mt-4" />}
-                  </div>
+                  </Card>
                 );
               })}
             </div>
 
-            <div className="flex justify-end mt-6">
+            <div className="flex justify-end pt-6 border-t border-slate-200 mt-6">
               <Button
                 onClick={performVerification}
-                disabled={isLoading}
-                className="bg-blue-600 hover:bg-blue-700"
+                disabled={isLoading || !apiKey}
+                className="bg-blue-600 hover:bg-blue-700 px-6 py-2"
               >
                 {isLoading ? (
                   <div className="flex items-center">
@@ -712,7 +709,7 @@ const UnifiedVerification: React.FC<UnifiedVerificationProps> = ({ apiKey, onRes
                     Processing...
                   </div>
                 ) : (
-                  `Verify ${selectedServices.length} Service(s)`
+                  `Verify ${selectedServices.length} Service${selectedServices.length > 1 ? 's' : ''}`
                 )}
               </Button>
             </div>
