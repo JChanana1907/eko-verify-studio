@@ -4,10 +4,16 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Building2, Car, Factory, FileCheck, Shield, Upload, GraduationCap, Award, CreditCard, Heart, Truck, Users, Search } from "lucide-react";
+import { Building2, Car, Factory, FileCheck, Shield, Upload, GraduationCap, Award, CreditCard, Heart, Truck, Users, Search, X } from "lucide-react";
 import { toast } from "sonner";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { CalendarIcon } from "lucide-react";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 import DragDropService from "@/components/common/DragDropService";
 import EmploymentVerification from "./EmploymentVerification";
 import GSTINVerification from "./GSTINVerification";
@@ -15,6 +21,7 @@ import VehicleVerification from "./VehicleVerification";
 import FinancialVerification from "./FinancialVerification";
 import HealthcareVerification from "./HealthcareVerification";
 import EducationVerification from "./EducationVerification";
+import { EkoApiService } from "@/services/ekoApiService";
 
 interface UnifiedVerificationProps {
   apiKey: string;
@@ -25,6 +32,8 @@ const UnifiedVerification: React.FC<UnifiedVerificationProps> = ({ apiKey, onRes
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
+  const [formData, setFormData] = useState<Record<string, any>>({});
+  const [isLoading, setIsLoading] = useState(false);
 
   const categories = [
     { id: "all", label: "All Services", icon: Shield },
@@ -38,9 +47,15 @@ const UnifiedVerification: React.FC<UnifiedVerificationProps> = ({ apiKey, onRes
 
   const allServices = [
     // Employment Services
-    { id: 'pan', name: 'PAN Verification', icon: FileCheck, color: 'bg-blue-500', category: 'employment', description: 'Verify PAN card details', fields: ['pan_number', 'holder_name', 'dob'] },
-    { id: 'aadhaar', name: 'Aadhaar Verification', icon: Users, color: 'bg-green-500', category: 'employment', description: 'Verify Aadhaar card details', fields: ['aadhaar_number', 'holder_name'] },
-    { id: 'bank-account', name: 'Bank Account Verification', icon: CreditCard, color: 'bg-purple-500', category: 'employment', description: 'Verify bank account details', fields: ['account_number', 'ifsc_code', 'holder_name'] },
+    { id: 'pan', name: 'PAN Verification', icon: FileCheck, color: 'bg-blue-500', category: 'employment', description: 'Verify PAN card details', fields: ['pan_number', 'name', 'dob'] },
+    { id: 'aadhaar', name: 'Aadhaar Verification', icon: Users, color: 'bg-green-500', category: 'employment', description: 'Verify Aadhaar card details', fields: ['aadhaar_number', 'name'] },
+    { id: 'bank-account', name: 'Bank Account Verification', icon: CreditCard, color: 'bg-purple-500', category: 'employment', description: 'Verify bank account details', fields: ['account_number', 'ifsc_code', 'name'] },
+    { id: 'mobile-otp', name: 'Mobile OTP Verification', icon: Users, color: 'bg-orange-500', category: 'employment', description: 'Send OTP to mobile number', fields: ['mobile_number'] },
+    { id: 'digilocker', name: 'Digilocker Access', icon: FileCheck, color: 'bg-indigo-500', category: 'employment', description: 'Access Digilocker documents', fields: ['digilocker_id'] },
+    { id: 'voter-id', name: 'Voter ID Verification', icon: Users, color: 'bg-red-500', category: 'employment', description: 'Verify voter ID details', fields: ['voter_id', 'name'] },
+    { id: 'passport', name: 'Passport Verification', icon: FileCheck, color: 'bg-teal-500', category: 'employment', description: 'Verify passport details', fields: ['passport_number', 'name'] },
+    { id: 'employee-details', name: 'Employee Verification', icon: Building2, color: 'bg-cyan-500', category: 'employment', description: 'Verify employee details', fields: ['employee_id', 'company_name'] },
+    { id: 'name-match', name: 'Name Matching', icon: Users, color: 'bg-pink-500', category: 'employment', description: 'Match names across documents', fields: ['name1', 'name2'] },
     
     // GSTIN Services
     { id: 'gstin', name: 'GSTIN Verification', icon: Factory, color: 'bg-green-600', category: 'gstin', description: 'Verify GSTIN registration', fields: ['gstin_number', 'business_name'] },
@@ -50,16 +65,20 @@ const UnifiedVerification: React.FC<UnifiedVerificationProps> = ({ apiKey, onRes
     { id: 'driving-licence', name: 'Driving Licence Verification', icon: Truck, color: 'bg-red-500', category: 'vehicle', description: 'Verify driving licence details', fields: ['licence_number', 'holder_name', 'date_of_birth'] },
     
     // Financial Services
-    { id: 'credit-score', name: 'Credit Score Check', icon: Shield, color: 'bg-indigo-500', category: 'financial', description: 'Check credit score and history', fields: ['pan_number', 'holder_name', 'date_of_birth'] },
-    { id: 'loan-eligibility', name: 'Loan Eligibility Check', icon: CreditCard, color: 'bg-teal-500', category: 'financial', description: 'Check loan eligibility', fields: ['pan_number', 'annual_income', 'employment_type'] },
+    { id: 'credit-score', name: 'Credit Score Check', icon: Shield, color: 'bg-indigo-500', category: 'financial', description: 'Check credit score and history', fields: ['pan_number', 'mobile_number'] },
+    { id: 'bank-statement', name: 'Bank Statement Analysis', icon: CreditCard, color: 'bg-purple-500', category: 'financial', description: 'Analyze bank statement', fields: ['account_number', 'bank_name', 'statement_period'] },
+    { id: 'income-verification', name: 'Income Verification', icon: CreditCard, color: 'bg-green-500', category: 'financial', description: 'Verify income details', fields: ['pan_number', 'employer_name', 'salary_account'] },
+    { id: 'loan-eligibility', name: 'Loan Eligibility Check', icon: CreditCard, color: 'bg-teal-500', category: 'financial', description: 'Check loan eligibility', fields: ['pan_number', 'monthly_income', 'loan_amount'] },
     
     // Healthcare Services
     { id: 'medical-license', name: 'Medical License Verification', icon: Heart, color: 'bg-pink-500', category: 'healthcare', description: 'Verify medical practitioner license', fields: ['license_number', 'doctor_name', 'specialization'] },
-    { id: 'insurance-policy', name: 'Insurance Policy Verification', icon: Shield, color: 'bg-cyan-500', category: 'healthcare', description: 'Verify insurance policy details', fields: ['policy_number', 'holder_name', 'provider_name'] },
+    { id: 'insurance-policy', name: 'Insurance Policy Verification', icon: Shield, color: 'bg-cyan-500', category: 'healthcare', description: 'Verify insurance policy details', fields: ['policy_number', 'insurer_name', 'policy_holder'] },
+    { id: 'pharmacy-license', name: 'Pharmacy License Verification', icon: Heart, color: 'bg-red-500', category: 'healthcare', description: 'Verify pharmacy license', fields: ['license_number', 'pharmacy_name', 'permit_type'] },
     
     // Education Services
-    { id: 'degree-verification', name: 'Degree Verification', icon: GraduationCap, color: 'bg-indigo-500', category: 'education', description: 'Verify educational degrees', fields: ['degree_number', 'university_name', 'student_name'] },
-    { id: 'professional-certification', name: 'Professional Certification', icon: Award, color: 'bg-purple-500', category: 'education', description: 'Verify professional certifications', fields: ['certificate_number', 'certifying_body', 'certificate_holder'] }
+    { id: 'degree-verification', name: 'Degree Verification', icon: GraduationCap, color: 'bg-indigo-500', category: 'education', description: 'Verify educational degrees', fields: ['degree_number', 'university_name', 'student_name', 'graduation_year'] },
+    { id: 'professional-certification', name: 'Professional Certification', icon: Award, color: 'bg-purple-500', category: 'education', description: 'Verify professional certifications', fields: ['certificate_number', 'certifying_body', 'certificate_holder'] },
+    { id: 'regulatory-compliance', name: 'Regulatory Compliance Check', icon: Shield, color: 'bg-orange-500', category: 'education', description: 'Check regulatory compliance', fields: ['license_number', 'regulatory_body', 'license_holder', 'license_type'] }
   ];
 
   const filteredServices = useMemo(() => {
@@ -85,6 +104,202 @@ const UnifiedVerification: React.FC<UnifiedVerificationProps> = ({ apiKey, onRes
     }
   };
 
+  const removeService = (serviceId: string) => {
+    setSelectedServices(prev => prev.filter(id => id !== serviceId));
+    setFormData(prev => {
+      const copy = { ...prev };
+      delete copy[serviceId];
+      return copy;
+    });
+    toast.success("Service removed from verification queue");
+  };
+
+  const handleInputChange = (serviceId: string, field: string, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      [serviceId]: { ...(prev[serviceId] || {}), [field]: value }
+    }));
+  };
+
+  const handleDateChange = (serviceId: string, field: string, date: Date | undefined) => {
+    if (date) {
+      const formattedDate = format(date, "yyyy-MM-dd");
+      handleInputChange(serviceId, field, formattedDate);
+    }
+  };
+
+  const performVerification = async () => {
+    if (!apiKey) {
+      toast.error("Please configure your API key first");
+      return;
+    }
+    if (selectedServices.length === 0) {
+      toast.error("Please select at least one verification service");
+      return;
+    }
+
+    setIsLoading(true);
+    const ekoService = new EkoApiService(apiKey);
+
+    try {
+      for (const serviceId of selectedServices) {
+        const service = allServices.find(s => s.id === serviceId);
+        const serviceData = formData[serviceId] || {};
+
+        let apiResult;
+        switch (serviceId) {
+          case 'bank-account':
+            apiResult = await ekoService.verifyBankAccount(
+              serviceData.account_number, serviceData.ifsc_code, serviceData.name
+            );
+            break;
+          case 'pan':
+            apiResult = await ekoService.verifyPAN(
+              serviceData.pan_number, serviceData.name, serviceData.dob
+            );
+            break;
+          case 'aadhaar':
+            apiResult = await ekoService.verifyAadhaar(
+              serviceData.aadhaar_number, serviceData.name
+            );
+            break;
+          case 'mobile-otp':
+            apiResult = await ekoService.sendMobileOTP(serviceData.mobile_number);
+            break;
+          case 'digilocker':
+            apiResult = await ekoService.accessDigilocker(serviceData.digilocker_id);
+            break;
+          case 'voter-id':
+            apiResult = await ekoService.verifyVoterID(
+              serviceData.voter_id, serviceData.name
+            );
+            break;
+          case 'passport':
+            apiResult = await ekoService.verifyPassport(
+              serviceData.passport_number, serviceData.name
+            );
+            break;
+          case 'employee-details':
+            apiResult = await ekoService.verifyEmployeeDetails(
+              serviceData.employee_id, serviceData.company_name
+            );
+            break;
+          case 'name-match':
+            apiResult = await ekoService.nameMatch(
+              serviceData.name1, serviceData.name2
+            );
+            break;
+          case 'gstin':
+            apiResult = await ekoService.verifyGSTIN(
+              serviceData.gstin_number, serviceData.business_name
+            );
+            break;
+          case 'vehicle-rc':
+            apiResult = await ekoService.verifyVehicleRC(
+              serviceData.registration_number, serviceData.owner_name
+            );
+            break;
+          case 'driving-licence':
+            apiResult = await ekoService.verifyDrivingLicence(
+              serviceData.licence_number, serviceData.holder_name, serviceData.date_of_birth
+            );
+            break;
+          case 'credit-score':
+            apiResult = await ekoService.getCreditScore(
+              serviceData.pan_number, serviceData.mobile_number
+            );
+            break;
+          case 'bank-statement':
+            apiResult = await ekoService.analyzeBankStatement(
+              serviceData.account_number, serviceData.bank_name, serviceData.statement_period
+            );
+            break;
+          case 'income-verification':
+            apiResult = await ekoService.verifyIncome(
+              serviceData.pan_number, serviceData.employer_name, serviceData.salary_account
+            );
+            break;
+          case 'loan-eligibility':
+            apiResult = await ekoService.checkLoanEligibility(
+              serviceData.pan_number, serviceData.monthly_income, serviceData.loan_amount
+            );
+            break;
+          case 'medical-license':
+            apiResult = await ekoService.verifyMedicalLicense(
+              serviceData.license_number, serviceData.doctor_name, serviceData.specialization
+            );
+            break;
+          case 'insurance-policy':
+            apiResult = await ekoService.verifyInsurancePolicy(
+              serviceData.policy_number, serviceData.insurer_name, serviceData.policy_holder
+            );
+            break;
+          case 'pharmacy-license':
+            apiResult = await ekoService.verifyPharmacyLicense(
+              serviceData.license_number, serviceData.pharmacy_name, serviceData.permit_type
+            );
+            break;
+          case 'degree-verification':
+            apiResult = await ekoService.verifyDegree(
+              serviceData.degree_number, serviceData.university_name, serviceData.student_name, serviceData.graduation_year
+            );
+            break;
+          case 'professional-certification':
+            apiResult = await ekoService.verifyProfessionalCertification(
+              serviceData.certificate_number, serviceData.certifying_body, serviceData.certificate_holder
+            );
+            break;
+          case 'regulatory-compliance':
+            apiResult = await ekoService.checkRegulatoryCompliance(
+              serviceData.license_number, serviceData.regulatory_body, serviceData.license_holder, serviceData.license_type
+            );
+            break;
+          default:
+            continue;
+        }
+
+        if (!apiResult) continue;
+
+        const raw = apiResult.data?.data ?? apiResult.data;
+        let displayResponse: { verified?: boolean; details?: any };
+
+        switch (serviceId) {
+          case 'pan':
+            const verified = raw?.pan_status === 'E';
+            displayResponse = { verified, details: raw };
+            break;
+          default:
+            displayResponse = { verified: undefined, details: raw };
+        }
+
+        onResult({
+          id: Date.now(),
+          timestamp: new Date(),
+          service: service?.name ?? serviceId,
+          category: 'Unified Verification',
+          status: apiResult.success ? 'SUCCESS' : 'FAILED',
+          data: serviceData,
+          response: displayResponse,
+          error: apiResult.error
+        });
+
+        if (apiResult.success) {
+          toast.success(`${service?.name} verification succeeded`);
+        } else {
+          toast.error(`${service?.name} verification failed: ${apiResult.error}`);
+        }
+      }
+
+      setSelectedServices([]);
+      setFormData({});
+    } catch (err) {
+      console.error('Verification error:', err);
+      toast.error("Verification failed. Please check your API key and try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const getCategoryComponent = (categoryId: string) => {
     switch (categoryId) {
       case 'employment':
@@ -102,6 +317,49 @@ const UnifiedVerification: React.FC<UnifiedVerificationProps> = ({ apiKey, onRes
       default:
         return null;
     }
+  };
+
+  const renderInputField = (serviceId: string, field: string) => {
+    const isDateField = field.includes('date') || field === 'dob' || field === 'date_of_birth';
+    const fieldValue = formData[serviceId]?.[field] || '';
+
+    if (isDateField) {
+      return (
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              className={cn(
+                "w-full justify-start text-left font-normal",
+                !fieldValue && "text-muted-foreground"
+              )}
+            >
+              <CalendarIcon className="mr-2 h-4 w-4" />
+              {fieldValue ? format(new Date(fieldValue), "PPP") : <span>Pick a date</span>}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <Calendar
+              mode="single"
+              selected={fieldValue ? new Date(fieldValue) : undefined}
+              onSelect={(date) => handleDateChange(serviceId, field, date)}
+              disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
+              initialFocus
+              className="pointer-events-auto"
+            />
+          </PopoverContent>
+        </Popover>
+      );
+    }
+
+    return (
+      <Input
+        placeholder={`Enter ${field.replace(/_/g, ' ')}`}
+        value={fieldValue}
+        onChange={(e) => handleInputChange(serviceId, field, e.target.value)}
+        className="mt-1"
+      />
+    );
   };
 
   // If "all" category is selected, show the unified service selector
@@ -173,6 +431,73 @@ const UnifiedVerification: React.FC<UnifiedVerificationProps> = ({ apiKey, onRes
             </div>
           )}
         </Card>
+
+        {/* Configuration panel */}
+        {selectedServices.length > 0 && (
+          <Card className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-slate-900">Configure Selected Services</h3>
+              <Badge variant="secondary">{selectedServices.length} selected</Badge>
+            </div>
+
+            <div className="space-y-6">
+              {selectedServices.map((serviceId, idx) => {
+                const service = allServices.find(s => s.id === serviceId);
+                if (!service) return null;
+
+                const Icon = service.icon;
+                return (
+                  <div key={serviceId} className="p-4 border border-slate-200 rounded-lg">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center space-x-3">
+                        <div className={`p-2 rounded-md ${service.color}`}>
+                          <Icon className="h-4 w-4 text-white" />
+                        </div>
+                        <div>
+                          <h4 className="font-medium text-slate-900">{service.name}</h4>
+                          <p className="text-sm text-slate-600">{service.description}</p>
+                        </div>
+                      </div>
+                      <Button size="sm" variant="outline" onClick={() => removeService(serviceId)}>
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {service.fields.map(field => (
+                        <div key={field}>
+                          <Label className="text-sm font-medium capitalize">
+                            {field.replace(/_/g, ' ')}
+                          </Label>
+                          {renderInputField(serviceId, field)}
+                        </div>
+                      ))}
+                    </div>
+
+                    {idx < selectedServices.length - 1 && <Separator className="mt-4" />}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="flex justify-end mt-6">
+              <Button
+                onClick={performVerification}
+                disabled={isLoading}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                {isLoading ? (
+                  <div className="flex items-center">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Processing...
+                  </div>
+                ) : (
+                  `Verify ${selectedServices.length} Service(s)`
+                )}
+              </Button>
+            </div>
+          </Card>
+        )}
       </div>
     );
   }

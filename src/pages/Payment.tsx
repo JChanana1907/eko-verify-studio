@@ -5,17 +5,57 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, CreditCard, Wallet, Check } from 'lucide-react';
+import { ArrowLeft, CreditCard, Wallet, Check, QrCode } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from "sonner";
+import QRCode from 'qrcode';
 
 const PaymentPage = () => {
   const navigate = useNavigate();
   const [selectedAmount, setSelectedAmount] = useState(1000);
   const [customAmount, setCustomAmount] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [qrCodeUrl, setQrCodeUrl] = useState('');
+  const [showQRCode, setShowQRCode] = useState(false);
+  const [qrAmount, setQrAmount] = useState('');
+  const [isGeneratingQR, setIsGeneratingQR] = useState(false);
 
   const predefinedAmounts = [500, 1000, 2000, 5000, 10000];
+
+  const generateQRCode = async () => {
+    const amount = parseInt(qrAmount);
+    
+    if (!amount || amount < 100 || amount > 100000) {
+      toast.error('Amount should be between ₹100 and ₹1,00,000');
+      return;
+    }
+
+    setIsGeneratingQR(true);
+
+    try {
+      // Generate UPI payment string
+      const upiString = `upi://pay?pa=merchant@payu&pn=Eko Shield&am=${amount}&cu=INR&tn=Credits for Eko Shield`;
+      
+      // Generate QR code
+      const qrDataUrl = await QRCode.toDataURL(upiString, {
+        width: 300,
+        margin: 2,
+        color: {
+          dark: '#000000',
+          light: '#FFFFFF'
+        }
+      });
+      
+      setQrCodeUrl(qrDataUrl);
+      setShowQRCode(true);
+      toast.success(`QR Code generated for ₹${amount}`);
+    } catch (error) {
+      toast.error('Failed to generate QR code. Please try again.');
+      console.error('QR generation error:', error);
+    } finally {
+      setIsGeneratingQR(false);
+    }
+  };
 
   const handlePayUPayment = async () => {
     const amount = customAmount ? parseInt(customAmount) : selectedAmount;
@@ -187,7 +227,7 @@ const PaymentPage = () => {
             <Button 
               onClick={handlePayUPayment}
               disabled={isProcessing || (!customAmount && !selectedAmount)}
-              className="w-full bg-orange-600 hover:bg-orange-700"
+              className="w-full bg-orange-600 hover:bg-orange-700 mb-4"
               size="lg"
             >
               {isProcessing ? (
@@ -201,63 +241,124 @@ const PaymentPage = () => {
                 </>
               )}
             </Button>
+
+            {/* QR Code Generation */}
+            <div className="border-t pt-4">
+              <h3 className="text-lg font-semibold text-slate-900 mb-3">Or Generate QR Code</h3>
+              <div className="flex space-x-2">
+                <Input
+                  type="number"
+                  placeholder="Enter amount (max ₹1,00,000)"
+                  value={qrAmount}
+                  onChange={(e) => setQrAmount(e.target.value)}
+                  className="flex-1"
+                  max="100000"
+                />
+                <Button 
+                  onClick={generateQRCode}
+                  disabled={isGeneratingQR || !qrAmount}
+                  variant="outline"
+                  className="flex items-center space-x-2"
+                >
+                  <QrCode className="h-4 w-4" />
+                  <span>Generate QR</span>
+                </Button>
+              </div>
+            </div>
           </Card>
 
-          {/* Payment Security & Info */}
+          {/* Payment Security & Info / QR Code Display */}
           <Card className="p-6">
-            <div className="flex items-center space-x-3 mb-6">
-              <Wallet className="h-6 w-6 text-green-600" />
-              <h2 className="text-xl font-bold text-slate-900">Payment Information</h2>
-            </div>
+            {showQRCode ? (
+              <div className="text-center">
+                <div className="flex items-center space-x-3 mb-6">
+                  <QrCode className="h-6 w-6 text-blue-600" />
+                  <h2 className="text-xl font-bold text-slate-900">Payment QR Code</h2>
+                </div>
+                
+                <div className="bg-white p-4 rounded-lg border-2 border-slate-200 mb-4">
+                  <img src={qrCodeUrl} alt="Payment QR Code" className="mx-auto" />
+                </div>
+                
+                <p className="text-sm text-slate-600 mb-4">
+                  Scan this QR code with any UPI app to pay ₹{qrAmount}
+                </p>
+                
+                <Button 
+                  onClick={() => setShowQRCode(false)}
+                  variant="outline"
+                  className="w-full"
+                >
+                  Generate New QR Code
+                </Button>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center space-x-3 mb-6">
+                  <Wallet className="h-6 w-6 text-green-600" />
+                  <h2 className="text-xl font-bold text-slate-900">Payment Information</h2>
+                </div>
 
-            <div className="space-y-4">
-              <div className="flex items-start space-x-3">
-                <Check className="h-5 w-5 text-green-600 mt-0.5" />
-                <div>
-                  <h3 className="font-medium text-slate-900">Secure Payment</h3>
-                  <p className="text-sm text-slate-600">
-                    All payments are processed securely through PayU payment gateway
+                <div className="space-y-4">
+                  <div className="flex items-start space-x-3">
+                    <Check className="h-5 w-5 text-green-600 mt-0.5" />
+                    <div>
+                      <h3 className="font-medium text-slate-900">Secure Payment</h3>
+                      <p className="text-sm text-slate-600">
+                        All payments are processed securely through PayU payment gateway
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start space-x-3">
+                    <Check className="h-5 w-5 text-green-600 mt-0.5" />
+                    <div>
+                      <h3 className="font-medium text-slate-900">Instant Credit</h3>
+                      <p className="text-sm text-slate-600">
+                        Credits are added to your wallet immediately after successful payment
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start space-x-3">
+                    <Check className="h-5 w-5 text-green-600 mt-0.5" />
+                    <div>
+                      <h3 className="font-medium text-slate-900">QR Code Payment</h3>
+                      <p className="text-sm text-slate-600">
+                        Generate dynamic QR codes for UPI payments up to ₹1,00,000
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start space-x-3">
+                    <Check className="h-5 w-5 text-green-600 mt-0.5" />
+                    <div>
+                      <h3 className="font-medium text-slate-900">Multiple Payment Options</h3>
+                      <p className="text-sm text-slate-600">
+                        Credit/Debit Cards, Net Banking, UPI, and Wallets supported
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start space-x-3">
+                    <Check className="h-5 w-5 text-green-600 mt-0.5" />
+                    <div>
+                      <h3 className="font-medium text-slate-900">24/7 Support</h3>
+                      <p className="text-sm text-slate-600">
+                        Contact support for any payment related queries
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* PayU Logo */}
+                <div className="mt-6 pt-6 border-t border-slate-200">
+                  <p className="text-sm text-slate-500 text-center">
+                    Powered by <span className="font-medium text-orange-600">PayU</span> Payment Gateway
                   </p>
                 </div>
-              </div>
-
-              <div className="flex items-start space-x-3">
-                <Check className="h-5 w-5 text-green-600 mt-0.5" />
-                <div>
-                  <h3 className="font-medium text-slate-900">Instant Credit</h3>
-                  <p className="text-sm text-slate-600">
-                    Credits are added to your wallet immediately after successful payment
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start space-x-3">
-                <Check className="h-5 w-5 text-green-600 mt-0.5" />
-                <div>
-                  <h3 className="font-medium text-slate-900">Multiple Payment Options</h3>
-                  <p className="text-sm text-slate-600">
-                    Credit/Debit Cards, Net Banking, UPI, and Wallets supported
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start space-x-3">
-                <Check className="h-5 w-5 text-green-600 mt-0.5" />
-                <div>
-                  <h3 className="font-medium text-slate-900">24/7 Support</h3>
-                  <p className="text-sm text-slate-600">
-                    Contact support for any payment related queries
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* PayU Logo */}
-            <div className="mt-6 pt-6 border-t border-slate-200">
-              <p className="text-sm text-slate-500 text-center">
-                Powered by <span className="font-medium text-orange-600">PayU</span> Payment Gateway
-              </p>
-            </div>
+              </>
+            )}
           </Card>
         </div>
       </div>
