@@ -90,28 +90,28 @@ export class EkoApiService {
     });
   }
 
-async verifyPAN(panNumber: string, name: string, dob: string) {
-  console.log('[verifyPAN] Called with:', { panNumber, name });
-  try {
-    const requestData = {
-      pan_number: panNumber,
-      initiator_id: 7417247999,
-      //dob: '2000-08-13',
-      user_code: 32515001,
-      name: name,
-      dob: dob
-    };
-    console.log('[verifyPAN] Sending request data:', requestData);
+  async verifyPAN(panNumber: string, name: string, dob: string) {
+    console.log('[verifyPAN] Called with:', { panNumber, name });
+    try {
+      const requestData = {
+        pan_number: panNumber,
+        initiator_id: 7417247999,
+        //dob: '2000-08-13',
+        user_code: 32515001,
+        name: name,
+        dob: dob
+      };
+      console.log('[verifyPAN] Sending request data:', requestData);
 
-    const response = await this.makeRequest('/tools/kyc/pan-lite', requestData);
+      const response = await this.makeRequest('/tools/kyc/pan-lite', requestData);
 
-    console.log('[verifyPAN] Received response:', response);
-    return response;
-  } catch (error) {
-    console.error('[verifyPAN] Error occurred:', error);
-    throw error;
+      console.log('[verifyPAN] Received response:', response);
+      return response;
+    } catch (error) {
+      console.error('[verifyPAN] Error occurred:', error);
+      throw error;
+    }
   }
-}
 
   async verifyAadhaar(aadhaarNumber: string, name: string) {
     return this.makeRequest('/aadhaar/verify', {
@@ -268,5 +268,19 @@ async verifyPAN(panNumber: string, name: string, dob: string) {
       license_holder: licenseHolder,
       license_type: licenseType
     });
+  }
+
+  async generateDynamicQR(amount: number, transactionId: string, merchantName: string = 'Eko Shield'): Promise<ApiResponse> {
+    const data = {
+      initiator_id: 7417247999,
+      user_code: 32515001,
+      amount: amount,
+      transaction_id: transactionId,
+      purpose_code: '00',
+      merchant_name: merchantName,
+      expiry_minutes: 30
+    };
+
+    return this.makeRequest('/upi/generate-qr', data);
   }
 }

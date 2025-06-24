@@ -5,121 +5,112 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, CreditCard, Wallet, Check, QrCode } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Separator } from "@/components/ui/separator";
+import { ArrowLeft, CreditCard, Smartphone, QrCode, Wallet, IndianRupee } from "lucide-react";
+import { Link } from 'react-router-dom';
 import { toast } from "sonner";
-import QRCode from 'qrcode';
+import { EkoApiService } from "@/services/ekoApiService";
 
-const PaymentPage = () => {
-  const navigate = useNavigate();
-  const [selectedAmount, setSelectedAmount] = useState(1000);
-  const [customAmount, setCustomAmount] = useState('');
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [qrCodeUrl, setQrCodeUrl] = useState('');
-  const [showQRCode, setShowQRCode] = useState(false);
-  const [qrAmount, setQrAmount] = useState('');
+const Payment = () => {
+  const [selectedMethod, setSelectedMethod] = useState('payu');
+  const [amount, setAmount] = useState('');
+  const [qrCode, setQrCode] = useState('');
   const [isGeneratingQR, setIsGeneratingQR] = useState(false);
+  const [apiKey, setApiKey] = useState('');
 
-  const predefinedAmounts = [500, 1000, 2000, 5000, 10000];
+  const paymentMethods = [
+    {
+      id: 'payu',
+      name: 'PayU Gateway',
+      icon: CreditCard,
+      description: 'Credit/Debit Cards, Net Banking, UPI'
+    },
+    {
+      id: 'qr',
+      name: 'UPI QR Code',
+      icon: QrCode,
+      description: 'Generate dynamic QR code for UPI payment'
+    }
+  ];
+
+  const handleAmountChange = (value: string) => {
+    const numValue = parseFloat(value);
+    if (numValue > 100000) {
+      toast.error("Amount cannot exceed ₹1,00,000");
+      return;
+    }
+    setAmount(value);
+  };
 
   const generateQRCode = async () => {
-    const amount = parseInt(qrAmount);
+    if (!apiKey) {
+      toast.error("Please enter your API key first");
+      return;
+    }
     
-    if (!amount || amount < 100 || amount > 100000) {
-      toast.error('Amount should be between ₹100 and ₹1,00,000');
+    if (!amount || parseFloat(amount) <= 0) {
+      toast.error("Please enter a valid amount");
+      return;
+    }
+
+    if (parseFloat(amount) > 100000) {
+      toast.error("Amount cannot exceed ₹1,00,000");
       return;
     }
 
     setIsGeneratingQR(true);
-
+    
     try {
-      // Generate UPI payment string
-      const upiString = `upi://pay?pa=merchant@payu&pn=Eko Shield&am=${amount}&cu=INR&tn=Credits for Eko Shield`;
+      const ekoService = new EkoApiService(apiKey);
       
-      // Generate QR code
-      const qrDataUrl = await QRCode.toDataURL(upiString, {
-        width: 300,
-        margin: 2,
-        color: {
-          dark: '#000000',
-          light: '#FFFFFF'
-        }
+      // Generate QR code using Eko API
+      const qrData = {
+        merchant_id: 'MERCHANT_ID', // This should be your actual merchant ID
+        amount: parseFloat(amount),
+        transaction_id: `TXN_${Date.now()}`,
+        purpose_code: '00', // Person to Person transfer
+        merchant_name: 'Eko Shield',
+        merchant_upi_id: 'merchant@upi', // Your actual UPI ID
+        expiry_minutes: 30
+      };
+
+      // Call the Eko QR generation API
+      const response = await fetch('https://api.eko.in:25002/ekoicici/v3/upi/generate-qr', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'developer_key': apiKey,
+          'secret-key': 'your-secret-key', // This should be your actual secret key
+        },
+        body: JSON.stringify({
+          initiator_id: 7417247999,
+          user_code: 32515001,
+          ...qrData
+        })
       });
+
+      const result = await response.json();
       
-      setQrCodeUrl(qrDataUrl);
-      setShowQRCode(true);
-      toast.success(`QR Code generated for ₹${amount}`);
+      if (result.status === 0 && result.data?.qr_string) {
+        setQrCode(result.data.qr_string);
+        toast.success("QR Code generated successfully!");
+      } else {
+        toast.error(result.message || "Failed to generate QR code");
+      }
     } catch (error) {
-      toast.error('Failed to generate QR code. Please try again.');
       console.error('QR generation error:', error);
+      toast.error("Failed to generate QR code");
     } finally {
       setIsGeneratingQR(false);
     }
   };
 
-  const handlePayUPayment = async () => {
-    const amount = customAmount ? parseInt(customAmount) : selectedAmount;
-    
-    if (!amount || amount < 100) {
-      toast.error('Minimum amount is ₹100');
-      return;
-    }
-
-    setIsProcessing(true);
-
-    // PayU payment integration (demo implementation)
-    try {
-      // In a real implementation, you would:
-      // 1. Create a payment request on your backend
-      // 2. Get the PayU payment URL
-      // 3. Redirect to PayU payment gateway
-      
-      // For demo purposes, we'll simulate the payment flow
-      const paymentData = {
-        key: 'test_key', // Your PayU merchant key
-        txnid: `TXN_${Date.now()}`,
-        amount: amount,
-        productinfo: `Eko Shield Credits - ${amount} Credits`,
-        firstname: 'User',
-        email: 'user@example.com',
-        phone: '9999999999',
-        surl: `${window.location.origin}/payment-success`,
-        furl: `${window.location.origin}/payment-failure`,
-        hash: 'demo_hash' // This should be generated on your backend
-      };
-
-      // Create a form and submit to PayU (demo)
-      const form = document.createElement('form');
-      form.method = 'POST';
-      form.action = 'https://test.payu.in/_payment'; // Use https://secure.payu.in/_payment for live
-      
-      Object.keys(paymentData).forEach(key => {
-        const input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = key;
-        input.value = paymentData[key];
-        form.appendChild(input);
-      });
-
-      document.body.appendChild(form);
-      
-      // For demo purposes, show success message instead of actual payment
-      setTimeout(() => {
-        setIsProcessing(false);
-        toast.success(`Payment initiated for ₹${amount}. Redirecting to PayU...`);
-        // form.submit(); // Uncomment for actual PayU integration
-        
-        // Simulate successful payment for demo
-        setTimeout(() => {
-          toast.success(`${amount} credits added successfully!`);
-          navigate('/wallet');
-        }, 2000);
-      }, 1500);
-
-    } catch (error) {
-      setIsProcessing(false);
-      toast.error('Payment initiation failed. Please try again.');
-      console.error('Payment error:', error);
+  const handlePayment = () => {
+    if (selectedMethod === 'payu') {
+      // PayU integration logic here
+      toast.success("Redirecting to PayU Gateway...");
+    } else if (selectedMethod === 'qr') {
+      generateQRCode();
     }
   };
 
@@ -127,243 +118,182 @@ const PaymentPage = () => {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       {/* Header */}
       <div className="bg-white border-b border-slate-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => navigate('/wallet')}
-                className="flex items-center space-x-2"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                <span>Back to Wallet</span>
+        <div className="max-w-4xl mx-auto px-6 py-4">
+          <div className="flex items-center space-x-4">
+            <Link to="/">
+              <Button variant="ghost" size="sm">
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back
               </Button>
-              
-              <div className="flex items-center space-x-3">
-                <img 
-                  src="/lovable-uploads/cb6255c2-8a31-4856-b9b4-3aaf40ed7f92.png" 
-                  alt="EKO Logo" 
-                  className="h-10 w-auto"
-                />
-                <div className="flex items-center space-x-2">
-                  <span className="text-2xl font-bold text-slate-900">Eko Shield</span>
-                  <span className="text-lg text-slate-600">- Add Credits</span>
-                </div>
-              </div>
-              <Badge variant="outline" className="text-green-700 border-green-200 bg-green-50">
-                Secure Payment
-              </Badge>
+            </Link>
+            <div className="flex items-center space-x-3">
+              <Wallet className="h-6 w-6 text-blue-600" />
+              <h1 className="text-xl font-bold text-slate-900">Add Credits</h1>
             </div>
           </div>
         </div>
       </div>
 
       <div className="max-w-4xl mx-auto px-6 py-8">
+        {/* API Key Input */}
+        <Card className="p-6 mb-6">
+          <h3 className="text-lg font-semibold text-slate-900 mb-4">API Configuration</h3>
+          <div className="space-y-2">
+            <Label htmlFor="apiKey">Eko API Key</Label>
+            <Input
+              id="apiKey"
+              type="password"
+              placeholder="Enter your Eko API key"
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              className="max-w-md"
+            />
+          </div>
+        </Card>
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Payment Options */}
-          <Card className="p-6">
-            <div className="flex items-center space-x-3 mb-6">
-              <CreditCard className="h-6 w-6 text-blue-600" />
-              <h2 className="text-xl font-bold text-slate-900">Add Credits</h2>
-            </div>
+          {/* Payment Method Selection */}
+          <div className="space-y-6">
+            <Card className="p-6">
+              <h3 className="text-lg font-semibold text-slate-900 mb-4">Select Payment Method</h3>
+              <div className="space-y-3">
+                {paymentMethods.map((method) => {
+                  const IconComponent = method.icon;
+                  return (
+                    <button
+                      key={method.id}
+                      onClick={() => setSelectedMethod(method.id)}
+                      className={`w-full flex items-center space-x-4 p-4 rounded-lg border-2 transition-all ${
+                        selectedMethod === method.id
+                          ? 'border-blue-500 bg-blue-50'
+                          : 'border-slate-200 hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="p-2 rounded-md bg-blue-500">
+                        <IconComponent className="h-5 w-5 text-white" />
+                      </div>
+                      <div className="flex-1 text-left">
+                        <h4 className="font-medium text-slate-900">{method.name}</h4>
+                        <p className="text-sm text-slate-600">{method.description}</p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </Card>
 
-            {/* Predefined Amounts */}
-            <div className="mb-6">
-              <Label className="text-sm font-medium text-slate-700 mb-3 block">
-                Select Amount
-              </Label>
-              <div className="grid grid-cols-3 gap-3">
-                {predefinedAmounts.map((amount) => (
-                  <Button
-                    key={amount}
-                    variant={selectedAmount === amount ? "default" : "outline"}
-                    onClick={() => {
-                      setSelectedAmount(amount);
-                      setCustomAmount('');
-                    }}
-                    className="text-sm"
-                  >
-                    ₹{amount}
-                  </Button>
-                ))}
+            {/* Amount Input */}
+            <Card className="p-6">
+              <h3 className="text-lg font-semibold text-slate-900 mb-4">Enter Amount</h3>
+              <div className="space-y-4">
+                <div className="relative">
+                  <IndianRupee className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-500" />
+                  <Input
+                    type="number"
+                    placeholder="0"
+                    value={amount}
+                    onChange={(e) => handleAmountChange(e.target.value)}
+                    className="pl-10 text-lg"
+                    max={100000}
+                  />
+                </div>
+                <div className="flex justify-between text-sm text-slate-600">
+                  <span>Minimum: ₹100</span>
+                  <span>Maximum: ₹1,00,000</span>
+                </div>
+                
+                {/* Quick amount buttons */}
+                <div className="grid grid-cols-4 gap-2">
+                  {[500, 1000, 2500, 5000].map((quickAmount) => (
+                    <Button
+                      key={quickAmount}
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setAmount(quickAmount.toString())}
+                      className="text-xs"
+                    >
+                      ₹{quickAmount}
+                    </Button>
+                  ))}
+                </div>
               </div>
-            </div>
+            </Card>
+          </div>
 
-            {/* Custom Amount */}
-            <div className="mb-6">
-              <Label className="text-sm font-medium text-slate-700 mb-2 block">
-                Or Enter Custom Amount
-              </Label>
-              <Input
-                type="number"
-                placeholder="Enter amount (min ₹100)"
-                value={customAmount}
-                onChange={(e) => {
-                  setCustomAmount(e.target.value);
-                  setSelectedAmount(0);
-                }}
-                className="w-full"
-              />
-            </div>
+          {/* Payment Summary & QR Display */}
+          <div className="space-y-6">
+            <Card className="p-6">
+              <h3 className="text-lg font-semibold text-slate-900 mb-4">Payment Summary</h3>
+              <div className="space-y-3">
+                <div className="flex justify-between">
+                  <span className="text-slate-600">Credits to Add:</span>
+                  <span className="font-medium">{amount ? Math.floor(parseFloat(amount)) : 0}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-600">Amount:</span>
+                  <span className="font-medium">₹{amount || 0}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-600">Payment Method:</span>
+                  <Badge variant="outline">
+                    {paymentMethods.find(m => m.id === selectedMethod)?.name}
+                  </Badge>
+                </div>
+                <Separator />
+                <div className="flex justify-between text-lg font-semibold">
+                  <span>Total:</span>
+                  <span>₹{amount || 0}</span>
+                </div>
+              </div>
+            </Card>
 
-            {/* Payment Summary */}
-            <div className="bg-slate-50 p-4 rounded-lg mb-6">
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-slate-600">Amount:</span>
-                <span className="font-medium">₹{customAmount || selectedAmount}</span>
-              </div>
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-slate-600">Credits:</span>
-                <span className="font-medium">{customAmount || selectedAmount} Credits</span>
-              </div>
-              <div className="flex justify-between items-center text-green-600">
-                <span className="font-medium">Exchange Rate:</span>
-                <span className="font-medium">1:1 (₹1 = 1 Credit)</span>
-              </div>
-            </div>
+            {/* QR Code Display */}
+            {selectedMethod === 'qr' && qrCode && (
+              <Card className="p-6">
+                <h3 className="text-lg font-semibold text-slate-900 mb-4">UPI QR Code</h3>
+                <div className="text-center space-y-4">
+                  <div className="bg-white p-4 rounded-lg border-2 border-dashed border-slate-300 inline-block">
+                    <img 
+                      src={`data:image/svg+xml;base64,${btoa(qrCode)}`}
+                      alt="UPI QR Code"
+                      className="w-48 h-48 mx-auto"
+                    />
+                  </div>
+                  <p className="text-sm text-slate-600">
+                    Scan this QR code with any UPI app to make payment
+                  </p>
+                  <Badge variant="outline" className="text-orange-700 border-orange-200 bg-orange-50">
+                    Expires in 30 minutes
+                  </Badge>
+                </div>
+              </Card>
+            )}
 
             {/* Payment Button */}
-            <Button 
-              onClick={handlePayUPayment}
-              disabled={isProcessing || (!customAmount && !selectedAmount)}
-              className="w-full bg-orange-600 hover:bg-orange-700 mb-4"
-              size="lg"
-            >
-              {isProcessing ? (
-                <div className="flex items-center">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Processing...
-                </div>
-              ) : (
-                <>
-                  Pay with PayU - ₹{customAmount || selectedAmount}
-                </>
-              )}
-            </Button>
-
-            {/* QR Code Generation */}
-            <div className="border-t pt-4">
-              <h3 className="text-lg font-semibold text-slate-900 mb-3">Or Generate QR Code</h3>
-              <div className="flex space-x-2">
-                <Input
-                  type="number"
-                  placeholder="Enter amount (max ₹1,00,000)"
-                  value={qrAmount}
-                  onChange={(e) => setQrAmount(e.target.value)}
-                  className="flex-1"
-                  max="100000"
-                />
-                <Button 
-                  onClick={generateQRCode}
-                  disabled={isGeneratingQR || !qrAmount}
-                  variant="outline"
-                  className="flex items-center space-x-2"
-                >
-                  <QrCode className="h-4 w-4" />
-                  <span>Generate QR</span>
-                </Button>
-              </div>
-            </div>
-          </Card>
-
-          {/* Payment Security & Info / QR Code Display */}
-          <Card className="p-6">
-            {showQRCode ? (
-              <div className="text-center">
-                <div className="flex items-center space-x-3 mb-6">
-                  <QrCode className="h-6 w-6 text-blue-600" />
-                  <h2 className="text-xl font-bold text-slate-900">Payment QR Code</h2>
-                </div>
-                
-                <div className="bg-white p-4 rounded-lg border-2 border-slate-200 mb-4">
-                  <img src={qrCodeUrl} alt="Payment QR Code" className="mx-auto" />
-                </div>
-                
-                <p className="text-sm text-slate-600 mb-4">
-                  Scan this QR code with any UPI app to pay ₹{qrAmount}
-                </p>
-                
-                <Button 
-                  onClick={() => setShowQRCode(false)}
-                  variant="outline"
-                  className="w-full"
-                >
-                  Generate New QR Code
-                </Button>
-              </div>
-            ) : (
-              <>
-                <div className="flex items-center space-x-3 mb-6">
-                  <Wallet className="h-6 w-6 text-green-600" />
-                  <h2 className="text-xl font-bold text-slate-900">Payment Information</h2>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="flex items-start space-x-3">
-                    <Check className="h-5 w-5 text-green-600 mt-0.5" />
-                    <div>
-                      <h3 className="font-medium text-slate-900">Secure Payment</h3>
-                      <p className="text-sm text-slate-600">
-                        All payments are processed securely through PayU payment gateway
-                      </p>
-                    </div>
+            <Card className="p-6">
+              <Button
+                onClick={handlePayment}
+                disabled={!amount || parseFloat(amount) <= 0 || isGeneratingQR}
+                className="w-full bg-blue-600 hover:bg-blue-700"
+                size="lg"
+              >
+                {isGeneratingQR ? (
+                  <div className="flex items-center">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Generating QR...
                   </div>
-
-                  <div className="flex items-start space-x-3">
-                    <Check className="h-5 w-5 text-green-600 mt-0.5" />
-                    <div>
-                      <h3 className="font-medium text-slate-900">Instant Credit</h3>
-                      <p className="text-sm text-slate-600">
-                        Credits are added to your wallet immediately after successful payment
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start space-x-3">
-                    <Check className="h-5 w-5 text-green-600 mt-0.5" />
-                    <div>
-                      <h3 className="font-medium text-slate-900">QR Code Payment</h3>
-                      <p className="text-sm text-slate-600">
-                        Generate dynamic QR codes for UPI payments up to ₹1,00,000
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start space-x-3">
-                    <Check className="h-5 w-5 text-green-600 mt-0.5" />
-                    <div>
-                      <h3 className="font-medium text-slate-900">Multiple Payment Options</h3>
-                      <p className="text-sm text-slate-600">
-                        Credit/Debit Cards, Net Banking, UPI, and Wallets supported
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start space-x-3">
-                    <Check className="h-5 w-5 text-green-600 mt-0.5" />
-                    <div>
-                      <h3 className="font-medium text-slate-900">24/7 Support</h3>
-                      <p className="text-sm text-slate-600">
-                        Contact support for any payment related queries
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* PayU Logo */}
-                <div className="mt-6 pt-6 border-t border-slate-200">
-                  <p className="text-sm text-slate-500 text-center">
-                    Powered by <span className="font-medium text-orange-600">PayU</span> Payment Gateway
-                  </p>
-                </div>
-              </>
-            )}
-          </Card>
+                ) : selectedMethod === 'qr' ? (
+                  'Generate QR Code'
+                ) : (
+                  'Proceed to Payment'
+                )}
+              </Button>
+            </Card>
+          </div>
         </div>
       </div>
     </div>
   );
 };
 
-export default PaymentPage;
+export default Payment;

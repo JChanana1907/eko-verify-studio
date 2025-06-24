@@ -502,6 +502,11 @@ const UnifiedVerification: React.FC<UnifiedVerificationProps> = ({ apiKey, onRes
   };
 
   const renderInputField = (serviceId: string, field: string) => {
+    // Hide auto-filled fields from UI
+    if (field === 'initiator_id' || field === 'user_code') {
+      return null;
+    }
+
     const isDateField = field.includes('date') || field === 'dob' || field === 'date_of_birth';
     const fieldValue = formData[serviceId]?.[field] || '';
 
@@ -546,18 +551,12 @@ const UnifiedVerification: React.FC<UnifiedVerificationProps> = ({ apiKey, onRes
       );
     }
 
-    // Set default values for required fields
-    let defaultValue = '';
-    if (field === 'initiator_id') defaultValue = '7417247999';
-    if (field === 'user_code') defaultValue = '32515001';
-
     return (
       <Input
         placeholder={`Enter ${field.replace(/_/g, ' ')}`}
-        value={fieldValue || defaultValue}
+        value={fieldValue}
         onChange={(e) => handleInputChange(serviceId, field, e.target.value)}
         className="mt-1"
-        readOnly={field === 'initiator_id' || field === 'user_code'}
       />
     );
   };
@@ -689,9 +688,6 @@ const UnifiedVerification: React.FC<UnifiedVerificationProps> = ({ apiKey, onRes
                         <div key={field}>
                           <Label className="text-sm font-medium capitalize">
                             {field.replace(/_/g, ' ')}
-                            {(field === 'initiator_id' || field === 'user_code') && (
-                              <span className="text-xs text-slate-500 ml-1">(auto-filled)</span>
-                            )}
                           </Label>
                           {renderInputField(serviceId, field)}
                         </div>
