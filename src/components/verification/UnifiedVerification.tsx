@@ -272,6 +272,45 @@ const UnifiedVerification: React.FC<UnifiedVerificationProps> = ({ apiKey, onRes
     return services;
   }, [selectedCategory, searchQuery]);
 
+  // NEW: Deduplication logic for form fields
+  const consolidatedFields = useMemo(() => {
+    if (selectedServices.length === 0) return [];
+
+    const fieldMap = new Map<string, { 
+      field: string; 
+      label: string; 
+      requiredBy: string[];
+      isDateField: boolean;
+    }>();
+
+    selectedServices.forEach(serviceId => {
+      const service = allServices.find(s => s.id === serviceId);
+      if (!service) return;
+
+      service.fields.forEach(field => {
+        // Skip auto-filled fields
+        if (field === 'initiator_id' || field === 'user_code') return;
+
+        const isDateField = field.includes('date') || field === 'dob' || field === 'date_of_birth';
+        const label = field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+
+        if (fieldMap.has(field)) {
+          const existing = fieldMap.get(field)!;
+          existing.requiredBy.push(service.name);
+        } else {
+          fieldMap.set(field, {
+            field,
+            label,
+            requiredBy: [service.name],
+            isDateField
+          });
+        }
+      });
+    });
+
+    return Array.from(fieldMap.values()).sort((a, b) => a.label.localeCompare(b.label));
+  }, [selectedServices]);
+
   const handleServiceSelect = (serviceId: string) => {
     if (!selectedServices.includes(serviceId)) {
       setSelectedServices([...selectedServices, serviceId]);
@@ -281,25 +320,21 @@ const UnifiedVerification: React.FC<UnifiedVerificationProps> = ({ apiKey, onRes
 
   const removeService = (serviceId: string) => {
     setSelectedServices(prev => prev.filter(id => id !== serviceId));
-    setFormData(prev => {
-      const copy = { ...prev };
-      delete copy[serviceId];
-      return copy;
-    });
+    // Don't clear form data immediately as fields might be shared with other services
     toast.success("Service removed from verification queue");
   };
 
-  const handleInputChange = (serviceId: string, field: string, value: string) => {
+  const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({
       ...prev,
-      [serviceId]: { ...(prev[serviceId] || {}), [field]: value }
+      [field]: value
     }));
   };
 
-  const handleDateChange = (serviceId: string, field: string, date: Date | undefined) => {
+  const handleDateChange = (field: string, date: Date | undefined) => {
     if (date) {
       const formattedDate = format(date, "yyyy-MM-dd");
-      handleInputChange(serviceId, field, formattedDate);
+      handleInputChange(field, formattedDate);
     }
   };
 
@@ -319,121 +354,126 @@ const UnifiedVerification: React.FC<UnifiedVerificationProps> = ({ apiKey, onRes
     try {
       for (const serviceId of selectedServices) {
         const service = allServices.find(s => s.id === serviceId);
-        const serviceData = formData[serviceId] || {};
-
-        // Set default values for required fields
-        const defaultData = {
+        
+        // Map consolidated form data to service-specific data
+        const serviceData: any = {
           initiator_id: 7417247999,
-          user_code: 32515001,
-          ...serviceData
+          user_code: 32515001
         };
+
+        // Map form fields to service-specific field names
+        service?.fields.forEach(field => {
+          if (field !== 'initiator_id' && field !== 'user_code') {
+            serviceData[field] = formData[field] || '';
+          }
+        });
 
         let apiResult;
         switch (serviceId) {
           case 'bank-account':
             apiResult = await ekoService.verifyBankAccount(
-              defaultData.account_number, defaultData.ifsc_code, defaultData.name
+              serviceData.account_number, serviceData.ifsc_code, serviceData.name
             );
             break;
           case 'pan':
             apiResult = await ekoService.verifyPAN(
-              defaultData.pan_number, defaultData.name, defaultData.dob
+              serviceData.pan_number, serviceData.name, serviceData.dob
             );
             break;
           case 'aadhaar':
             apiResult = await ekoService.verifyAadhaar(
-              defaultData.aadhaar_number, defaultData.name
+              serviceData.aadhaar_number, serviceData.name
             );
             break;
           case 'mobile-otp':
-            apiResult = await ekoService.sendMobileOTP(defaultData.mobile_number);
+            apiResult = await ekoService.sendMobileOTP(serviceData.mobile_number);
             break;
           case 'digilocker':
-            apiResult = await ekoService.accessDigilocker(defaultData.digilocker_id);
+            apiResult = await ekoService.accessDigilocker(serviceData.digilocker_id);
             break;
           case 'voter-id':
             apiResult = await ekoService.verifyVoterID(
-              defaultData.voter_id, defaultData.name
+              serviceData.voter_id, serviceData.name
             );
             break;
           case 'passport':
             apiResult = await ekoService.verifyPassport(
-              defaultData.passport_number, defaultData.name
+              serviceData.passport_number, serviceData.name
             );
             break;
           case 'employee-details':
             apiResult = await ekoService.verifyEmployeeDetails(
-              defaultData.employee_id, defaultData.company_name
+              serviceData.employee_id, serviceData.company_name
             );
             break;
           case 'name-match':
             apiResult = await ekoService.nameMatch(
-              defaultData.name1, defaultData.name2
+              serviceData.name1, serviceData.name2
             );
             break;
           case 'gstin':
             apiResult = await ekoService.verifyGSTIN(
-              defaultData.gstin_number, defaultData.business_name
+              serviceData.gstin_number, serviceData.business_name
             );
             break;
           case 'vehicle-rc':
             apiResult = await ekoService.verifyVehicleRC(
-              defaultData.registration_number, defaultData.owner_name
+              serviceData.registration_number, serviceData.owner_name
             );
             break;
           case 'driving-licence':
             apiResult = await ekoService.verifyDrivingLicence(
-              defaultData.licence_number, defaultData.holder_name, defaultData.date_of_birth
+              serviceData.licence_number, serviceData.holder_name, serviceData.date_of_birth
             );
             break;
           case 'credit-score':
             apiResult = await ekoService.getCreditScore(
-              defaultData.pan_number, defaultData.mobile_number
+              serviceData.pan_number, serviceData.mobile_number
             );
             break;
           case 'bank-statement':
             apiResult = await ekoService.analyzeBankStatement(
-              defaultData.account_number, defaultData.bank_name, defaultData.statement_period
+              serviceData.account_number, serviceData.bank_name, serviceData.statement_period
             );
             break;
           case 'income-verification':
             apiResult = await ekoService.verifyIncome(
-              defaultData.pan_number, defaultData.employer_name, defaultData.salary_account
+              serviceData.pan_number, serviceData.employer_name, serviceData.salary_account
             );
             break;
           case 'loan-eligibility':
             apiResult = await ekoService.checkLoanEligibility(
-              defaultData.pan_number, defaultData.monthly_income, defaultData.loan_amount
+              serviceData.pan_number, serviceData.monthly_income, serviceData.loan_amount
             );
             break;
           case 'medical-license':
             apiResult = await ekoService.verifyMedicalLicense(
-              defaultData.license_number, defaultData.doctor_name, defaultData.specialization
+              serviceData.license_number, serviceData.doctor_name, serviceData.specialization
             );
             break;
           case 'insurance-policy':
             apiResult = await ekoService.verifyInsurancePolicy(
-              defaultData.policy_number, defaultData.insurer_name, defaultData.policy_holder
+              serviceData.policy_number, serviceData.insurer_name, serviceData.policy_holder
             );
             break;
           case 'pharmacy-license':
             apiResult = await ekoService.verifyPharmacyLicense(
-              defaultData.license_number, defaultData.pharmacy_name, defaultData.permit_type
+              serviceData.license_number, serviceData.pharmacy_name, serviceData.permit_type
             );
             break;
           case 'degree-verification':
             apiResult = await ekoService.verifyDegree(
-              defaultData.degree_number, defaultData.university_name, defaultData.student_name, defaultData.graduation_year
+              serviceData.degree_number, serviceData.university_name, serviceData.student_name, serviceData.graduation_year
             );
             break;
           case 'professional-certification':
             apiResult = await ekoService.verifyProfessionalCertification(
-              defaultData.certificate_number, defaultData.certifying_body, defaultData.certificate_holder
+              serviceData.certificate_number, serviceData.certifying_body, serviceData.certificate_holder
             );
             break;
           case 'regulatory-compliance':
             apiResult = await ekoService.checkRegulatoryCompliance(
-              defaultData.license_number, defaultData.regulatory_body, defaultData.license_holder, defaultData.license_type
+              serviceData.license_number, serviceData.regulatory_body, serviceData.license_holder, serviceData.license_type
             );
             break;
           default:
@@ -461,7 +501,7 @@ const UnifiedVerification: React.FC<UnifiedVerificationProps> = ({ apiKey, onRes
           service: service?.name ?? serviceId,
           category: 'Unified Verification',
           status: apiResult.success ? 'SUCCESS' : 'FAILED',
-          data: defaultData,
+          data: serviceData,
           response: displayResponse,
           error: apiResult.error
         });
@@ -502,14 +542,9 @@ const UnifiedVerification: React.FC<UnifiedVerificationProps> = ({ apiKey, onRes
     }
   };
 
-  const renderInputField = (serviceId: string, field: string) => {
-    // Hide auto-filled fields from UI
-    if (field === 'initiator_id' || field === 'user_code') {
-      return null;
-    }
-
-    const isDateField = field.includes('date') || field === 'dob' || field === 'date_of_birth';
-    const fieldValue = formData[serviceId]?.[field] || '';
+  const renderInputField = (fieldInfo: { field: string; label: string; requiredBy: string[]; isDateField: boolean }) => {
+    const { field, label, requiredBy, isDateField } = fieldInfo;
+    const fieldValue = formData[field] || '';
 
     if (isDateField) {
       return (
@@ -518,7 +553,7 @@ const UnifiedVerification: React.FC<UnifiedVerificationProps> = ({ apiKey, onRes
             type="text"
             placeholder="YYYY-MM-DD or use calendar below"
             value={fieldValue}
-            onChange={(e) => handleInputChange(serviceId, field, e.target.value)}
+            onChange={(e) => handleInputChange(field, e.target.value)}
             pattern="\d{4}-\d{2}-\d{2}"
             className="w-full"
           />
@@ -539,7 +574,7 @@ const UnifiedVerification: React.FC<UnifiedVerificationProps> = ({ apiKey, onRes
               <Calendar
                 mode="single"
                 selected={fieldValue ? new Date(fieldValue) : undefined}
-                onSelect={(date) => handleDateChange(serviceId, field, date)}
+                onSelect={(date) => handleDateChange(field, date)}
                 disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
                 initialFocus
                 className="pointer-events-auto"
@@ -552,9 +587,9 @@ const UnifiedVerification: React.FC<UnifiedVerificationProps> = ({ apiKey, onRes
 
     return (
       <Input
-        placeholder={`Enter ${field.replace(/_/g, ' ')}`}
+        placeholder={`Enter ${label.toLowerCase()}`}
         value={fieldValue}
-        onChange={(e) => handleInputChange(serviceId, field, e.target.value)}
+        onChange={(e) => handleInputChange(field, e.target.value)}
         className="w-full"
       />
     );
@@ -652,50 +687,62 @@ const UnifiedVerification: React.FC<UnifiedVerificationProps> = ({ apiKey, onRes
           )}
         </Card>
 
-        {/* Configuration panel for selected services - Consistent styling */}
+        {/* NEW: Consolidated Configuration Form */}
         {selectedServices.length > 0 && (
           <Card className="p-6">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-semibold text-slate-900">Configure Selected Services</h3>
-              <Badge variant="secondary" className="text-sm">{selectedServices.length} selected</Badge>
+              <div>
+                <h3 className="text-xl font-semibold text-slate-900">Consolidated Verification Form</h3>
+                <p className="text-sm text-slate-600 mt-1">
+                  Fill in the required information for all selected services
+                </p>
+              </div>
+              <Badge variant="secondary" className="text-sm">{selectedServices.length} services selected</Badge>
             </div>
 
-            <div className="space-y-6">
-              {selectedServices.map((serviceId, idx) => {
-                const service = allServices.find(s => s.id === serviceId);
-                if (!service) return null;
-
-                const Icon = service.icon;
-                return (
-                  <Card key={serviceId} className="p-6 border border-slate-200">
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center space-x-3">
-                        <div className={`p-2 rounded-lg ${service.color}`}>
-                          <Icon className="h-5 w-5 text-white" />
-                        </div>
-                        <div>
-                          <h4 className="font-semibold text-slate-900">{service.name}</h4>
-                          <p className="text-sm text-slate-600">{service.description}</p>
-                        </div>
-                      </div>
-                      <Button size="sm" variant="outline" onClick={() => removeService(serviceId)}>
-                        <X className="h-4 w-4" />
+            {/* Selected Services Summary */}
+            <div className="mb-6">
+              <h4 className="font-medium text-slate-900 mb-3">Selected Services:</h4>
+              <div className="flex flex-wrap gap-2">
+                {selectedServices.map(serviceId => {
+                  const service = allServices.find(s => s.id === serviceId);
+                  if (!service) return null;
+                  return (
+                    <Badge key={serviceId} variant="outline" className="flex items-center gap-1">
+                      {service.name}
+                      <Button 
+                        size="sm" 
+                        variant="ghost" 
+                        className="h-4 w-4 p-0 hover:bg-slate-200"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeService(serviceId);
+                        }}
+                      >
+                        <X className="h-3 w-3" />
                       </Button>
-                    </div>
+                    </Badge>
+                  );
+                })}
+              </div>
+            </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {service.fields.filter(field => field !== 'initiator_id' && field !== 'user_code').map(field => (
-                        <div key={field} className="space-y-2">
-                          <Label className="text-sm font-medium text-slate-700 capitalize">
-                            {field.replace(/_/g, ' ')}
-                          </Label>
-                          {renderInputField(serviceId, field)}
-                        </div>
-                      ))}
-                    </div>
-                  </Card>
-                );
-              })}
+            <Separator className="mb-6" />
+
+            {/* Consolidated Form Fields */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {consolidatedFields.map(fieldInfo => (
+                <div key={fieldInfo.field} className="space-y-2">
+                  <Label className="text-sm font-medium text-slate-900">
+                    {fieldInfo.label}
+                    <span className="text-red-500 ml-1">*</span>
+                  </Label>
+                  <div className="text-xs text-slate-500 mb-2">
+                    Required by: {fieldInfo.requiredBy.join(', ')}
+                  </div>
+                  {renderInputField(fieldInfo)}
+                </div>
+              ))}
             </div>
 
             <div className="flex justify-end pt-6 border-t border-slate-200 mt-6">
