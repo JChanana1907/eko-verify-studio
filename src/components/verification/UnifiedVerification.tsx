@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { CalendarIcon } from "lucide-react";
-import { format } from "date-fns";
+import { format, parse, isValid } from "date-fns";
 import { cn } from "@/lib/utils";
 import DragDropService from "@/components/common/DragDropService";
 import EmploymentVerification from "./EmploymentVerification";
@@ -332,10 +332,46 @@ const UnifiedVerification: React.FC<UnifiedVerificationProps> = ({ apiKey, onRes
   };
 
   const handleDateChange = (field: string, date: Date | undefined) => {
-    if (date) {
+    if (date && isValid(date)) {
       const formattedDate = format(date, "yyyy-MM-dd");
       handleInputChange(field, formattedDate);
     }
+  };
+
+  const handleDateInputChange = (field: string, value: string) => {
+    // Handle manual date input
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const parseDate = (dateString: string): Date | undefined => {
+    if (!dateString) return undefined;
+    
+    try {
+      // Try parsing YYYY-MM-DD format
+      const parsed = parse(dateString, 'yyyy-MM-dd', new Date());
+      if (isValid(parsed)) {
+        return parsed;
+      }
+      
+      // Try parsing DD-MM-YYYY format
+      const parsedDDMM = parse(dateString, 'dd-MM-yyyy', new Date());
+      if (isValid(parsedDDMM)) {
+        return parsedDDMM;
+      }
+      
+      // Try native Date parsing as fallback
+      const nativeDate = new Date(dateString);
+      if (isValid(nativeDate)) {
+        return nativeDate;
+      }
+    } catch (error) {
+      console.log('Date parsing error:', error);
+    }
+    
+    return undefined;
   };
 
   const performVerification = async () => {
@@ -547,37 +583,43 @@ const UnifiedVerification: React.FC<UnifiedVerificationProps> = ({ apiKey, onRes
     const fieldValue = formData[field] || '';
 
     if (isDateField) {
+      const parsedDate = parseDate(fieldValue);
+      
       return (
         <div className="space-y-2">
           <Input
             type="text"
             placeholder="YYYY-MM-DD"
             value={fieldValue}
-            onChange={(e) => handleInputChange(field, e.target.value)}
+            onChange={(e) => handleDateInputChange(field, e.target.value)}
             pattern="\d{4}-\d{2}-\d{2}"
             className="w-full"
           />
           <Popover>
             <PopoverTrigger asChild>
               <Button
+                type="button"
                 variant="outline"
                 className={cn(
                   "w-full justify-start text-left font-normal",
-                  !fieldValue && "text-muted-foreground"
+                  !parsedDate && "text-muted-foreground"
                 )}
               >
                 <CalendarIcon className="mr-2 h-4 w-4" />
-                {fieldValue ? format(new Date(fieldValue), "PPP") : <span>Pick a date</span>}
+                {parsedDate ? format(parsedDate, "PPP") : <span>Pick a date</span>}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
               <Calendar
                 mode="single"
-                selected={fieldValue ? new Date(fieldValue) : undefined}
+                selected={parsedDate}
                 onSelect={(date) => handleDateChange(field, date)}
                 disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
                 initialFocus
                 className="pointer-events-auto"
+                captionLayout="dropdown-buttons"
+                fromYear={1900}
+                toYear={new Date().getFullYear()}
               />
             </PopoverContent>
           </Popover>
