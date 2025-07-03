@@ -20,6 +20,40 @@ interface UnifiedVerificationProps {
   onResult: (result: any) => void;
 }
 
+// Field mapping for deduplication
+const FIELD_MAPPINGS: Record<string, string[]> = {
+  'full_name': ['name', 'holder_name', 'owner_name', 'doctor_name', 'student_name', 'certificate_holder', 'license_holder', 'policy_holder'],
+  'date_of_birth': ['dob', 'date_of_birth'],
+  'phone_number': ['mobile_number', 'phone_number'],
+  'identification_number': ['pan_number', 'aadhaar_number', 'voter_id', 'passport_number', 'license_number', 'registration_number', 'gstin_number', 'policy_number', 'certificate_number', 'degree_number'],
+  'organization_name': ['company_name', 'business_name', 'university_name', 'certifying_body', 'regulatory_body', 'employer_name', 'bank_name', 'insurer_name', 'pharmacy_name'],
+  'account_details': ['account_number', 'ifsc_code', 'salary_account'],
+  'specialization_type': ['specialization', 'permit_type', 'license_type']
+};
+
+const getCommonFieldName = (field: string): string => {
+  for (const [commonField, variants] of Object.entries(FIELD_MAPPINGS)) {
+    if (variants.includes(field)) {
+      return commonField;
+    }
+  }
+  return field;
+};
+
+const getFieldLabel = (field: string): string => {
+  const labelMappings: Record<string, string> = {
+    'full_name': 'Full Name',
+    'date_of_birth': 'Date of Birth',
+    'phone_number': 'Phone Number',
+    'identification_number': 'ID/Registration Number',
+    'organization_name': 'Organization/Institution Name',
+    'account_details': 'Account Details',
+    'specialization_type': 'Type/Specialization'
+  };
+  
+  return labelMappings[field] || field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+};
+
 const UnifiedVerification: React.FC<UnifiedVerificationProps> = ({ apiKey, onResult }) => {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -43,7 +77,7 @@ const UnifiedVerification: React.FC<UnifiedVerificationProps> = ({ apiKey, onRes
     return services;
   }, [selectedCategory, searchQuery]);
 
-  // Deduplication logic for form fields
+  // Enhanced deduplication logic for form fields
   const consolidatedFields = useMemo(() => {
     if (selectedServices.length === 0) return [];
 
@@ -52,6 +86,7 @@ const UnifiedVerification: React.FC<UnifiedVerificationProps> = ({ apiKey, onRes
       label: string; 
       requiredBy: string[];
       isDateField: boolean;
+      originalFields: string[];
     }>();
 
     selectedServices.forEach(serviceId => {
@@ -63,17 +98,22 @@ const UnifiedVerification: React.FC<UnifiedVerificationProps> = ({ apiKey, onRes
         if (field === 'initiator_id' || field === 'user_code') return;
 
         const isDateField = field.includes('date') || field === 'dob' || field === 'date_of_birth';
-        const label = field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        const commonField = getCommonFieldName(field);
+        const label = getFieldLabel(commonField);
 
-        if (fieldMap.has(field)) {
-          const existing = fieldMap.get(field)!;
+        if (fieldMap.has(commonField)) {
+          const existing = fieldMap.get(commonField)!;
           existing.requiredBy.push(service.name);
+          if (!existing.originalFields.includes(field)) {
+            existing.originalFields.push(field);
+          }
         } else {
-          fieldMap.set(field, {
-            field,
+          fieldMap.set(commonField, {
+            field: commonField,
             label,
             requiredBy: [service.name],
-            isDateField
+            isDateField,
+            originalFields: [field]
           });
         }
       });
@@ -140,12 +180,15 @@ const UnifiedVerification: React.FC<UnifiedVerificationProps> = ({ apiKey, onRes
           user_code: 32515001
         };
 
-        // Map form fields to service-specific field names
+        // Map common fields back to service-specific field names
         service?.fields.forEach(field => {
           if (field !== 'initiator_id' && field !== 'user_code') {
-            serviceData[field] = formData[field] || '';
+            const commonField = getCommonFieldName(field);
+            serviceData[field] = formData[commonField] || formData[field] || '';
           }
         });
+
+        console.log(`Service data for ${service?.name}:`, serviceData);
 
         const apiResult = await performVerificationService(serviceId, serviceData, ekoService);
         if (!apiResult) continue;

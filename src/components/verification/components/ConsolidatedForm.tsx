@@ -18,6 +18,7 @@ interface FieldInfo {
   label: string;
   requiredBy: string[];
   isDateField: boolean;
+  commonField?: string; // For mapping similar fields
 }
 
 interface ConsolidatedFormProps {
@@ -31,6 +32,42 @@ interface ConsolidatedFormProps {
   onDateInputChange: (field: string, value: string) => void;
   onVerify: () => void;
 }
+
+// Field mapping for deduplication - maps similar fields to common field names
+const FIELD_MAPPINGS: Record<string, string[]> = {
+  'full_name': ['name', 'holder_name', 'owner_name', 'doctor_name', 'student_name', 'certificate_holder', 'license_holder', 'policy_holder'],
+  'date_of_birth': ['dob', 'date_of_birth'],
+  'phone_number': ['mobile_number', 'phone_number'],
+  'identification_number': ['pan_number', 'aadhaar_number', 'voter_id', 'passport_number', 'license_number', 'registration_number', 'gstin_number', 'policy_number', 'certificate_number', 'degree_number'],
+  'organization_name': ['company_name', 'business_name', 'university_name', 'certifying_body', 'regulatory_body', 'employer_name', 'bank_name', 'insurer_name', 'pharmacy_name'],
+  'account_details': ['account_number', 'ifsc_code', 'salary_account'],
+  'specialization_type': ['specialization', 'permit_type', 'license_type']
+};
+
+// Get common field name for a given field
+const getCommonFieldName = (field: string): string => {
+  for (const [commonField, variants] of Object.entries(FIELD_MAPPINGS)) {
+    if (variants.includes(field)) {
+      return commonField;
+    }
+  }
+  return field;
+};
+
+// Get display label for a field
+const getFieldLabel = (field: string): string => {
+  const labelMappings: Record<string, string> = {
+    'full_name': 'Full Name',
+    'date_of_birth': 'Date of Birth',
+    'phone_number': 'Phone Number',
+    'identification_number': 'ID/Registration Number',
+    'organization_name': 'Organization/Institution Name',
+    'account_details': 'Account Details',
+    'specialization_type': 'Type/Specialization'
+  };
+  
+  return labelMappings[field] || field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+};
 
 const ConsolidatedForm: React.FC<ConsolidatedFormProps> = ({
   selectedServices,
@@ -47,19 +84,16 @@ const ConsolidatedForm: React.FC<ConsolidatedFormProps> = ({
     if (!dateString) return undefined;
     
     try {
-      // Try parsing YYYY-MM-DD format
       const parsed = parse(dateString, 'yyyy-MM-dd', new Date());
       if (isValid(parsed)) {
         return parsed;
       }
       
-      // Try parsing DD-MM-YYYY format
       const parsedDDMM = parse(dateString, 'dd-MM-yyyy', new Date());
       if (isValid(parsedDDMM)) {
         return parsedDDMM;
       }
       
-      // Try native Date parsing as fallback
       const nativeDate = new Date(dateString);
       if (isValid(nativeDate)) {
         return nativeDate;
@@ -116,6 +150,26 @@ const ConsolidatedForm: React.FC<ConsolidatedFormProps> = ({
               />
             </PopoverContent>
           </Popover>
+        </div>
+      );
+    }
+
+    // Special handling for account details (compound field)
+    if (field === 'account_details') {
+      return (
+        <div className="space-y-2">
+          <Input
+            placeholder="Account Number"
+            value={formData['account_number'] || ''}
+            onChange={(e) => onInputChange('account_number', e.target.value)}
+            className="w-full"
+          />
+          <Input
+            placeholder="IFSC Code"
+            value={formData['ifsc_code'] || ''}
+            onChange={(e) => onInputChange('ifsc_code', e.target.value)}
+            className="w-full"
+          />
         </div>
       );
     }
