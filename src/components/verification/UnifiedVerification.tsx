@@ -551,7 +551,7 @@ const UnifiedVerification: React.FC<UnifiedVerificationProps> = ({ apiKey, onRes
         <div className="space-y-2">
           <Input
             type="text"
-            placeholder="YYYY-MM-DD or use calendar below"
+            placeholder="YYYY-MM-DD"
             value={fieldValue}
             onChange={(e) => handleInputChange(field, e.target.value)}
             pattern="\d{4}-\d{2}-\d{2}"
