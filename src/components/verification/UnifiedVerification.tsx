@@ -375,6 +375,8 @@ const UnifiedVerification: React.FC<UnifiedVerificationProps> = ({ apiKey, onRes
   };
 
   const performVerification = async () => {
+    console.log('Verify button clicked - starting verification process');
+    
     if (!apiKey) {
       toast.error("Please configure your API key first");
       return;
@@ -390,6 +392,7 @@ const UnifiedVerification: React.FC<UnifiedVerificationProps> = ({ apiKey, onRes
     try {
       for (const serviceId of selectedServices) {
         const service = allServices.find(s => s.id === serviceId);
+        console.log(`Processing service: ${service?.name}`);
         
         // Map consolidated form data to service-specific data
         const serviceData: any = {
@@ -403,6 +406,8 @@ const UnifiedVerification: React.FC<UnifiedVerificationProps> = ({ apiKey, onRes
             serviceData[field] = formData[field] || '';
           }
         });
+
+        console.log(`Service data for ${serviceId}:`, serviceData);
 
         let apiResult;
         switch (serviceId) {
@@ -513,6 +518,7 @@ const UnifiedVerification: React.FC<UnifiedVerificationProps> = ({ apiKey, onRes
             );
             break;
           default:
+            console.log(`No API method found for service: ${serviceId}`);
             continue;
         }
 
